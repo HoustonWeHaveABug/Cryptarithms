@@ -32,6 +32,7 @@ void set_word_letter(word_letter_t *, letter_t *, int);
 void set_word_letters_power(int);
 int compare_word_letters(const void *, const void *);
 void cryptarithm(int, int, int);
+int check_remaining_terms(int, int);
 int check_terms(int, int);
 void free_word_letters(void);
 
@@ -51,7 +52,7 @@ int main(void) {
 	word_len = 0;
 	state = STATE_START;
 
-	/* Parse input
+	/* Parse input */
 	symbol = fgetc(stdin);
 	while (!feof(stdin)) {
 		int digit;
@@ -244,7 +245,7 @@ const word_letter_t *word_letter_a = (const word_letter_t *)a, *word_letter_b = 
 void cryptarithm(int power_last, int terms_idx_last, int word_letters_idx) {
 	nodes_n++;
 	if (word_letters_idx == word_letters_n) {
-		if (check_terms(power_last, terms_idx_last)) {
+		if (check_remaining_terms(power_last, terms_idx_last)) {
 			int letter_idx;
 			printf("SOLUTION %d\n", ++solutions_n);
 			for (letter_idx = 0; letter_idx < letters_n; letter_idx++) {
@@ -257,7 +258,7 @@ void cryptarithm(int power_last, int terms_idx_last, int word_letters_idx) {
 		if (word_letters[word_letters_idx].power > power_last) {
 			int terms_idx;
 			if (power_last > -1) {
-				if (!check_terms(power_last, terms_idx_last)) {
+				if (!check_remaining_terms(power_last, terms_idx_last)) {
 					return;
 				}
 				for (terms_idx = 0; terms_idx < terms_n; terms_idx++) {
@@ -298,6 +299,15 @@ void cryptarithm(int power_last, int terms_idx_last, int word_letters_idx) {
 			sums[word_letters[word_letters_idx].power*terms_n+word_letters[word_letters_idx].terms_idx] -= word_letters[word_letters_idx].letter->value;
 		}
 	}
+}
+
+int check_remaining_terms(int power, int terms_idx_last) {
+int terms_idx;
+	if (terms_idx_last == 0) {
+		terms_idx_last++;
+	}
+	for (terms_idx = terms_idx_last; terms_idx < terms_n && check_terms(power, terms_idx); terms_idx++);
+	return terms_idx == terms_n;
 }
 
 int check_terms(int power, int terms_idx) {
