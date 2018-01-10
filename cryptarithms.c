@@ -147,16 +147,16 @@ int main(void) {
 				free_word_letters();
 				return EXIT_FAILURE;
 			}
-			if (!add_word_letter(symbol, terms_idx, word_len)) {
-				free_word_letters();
-				return EXIT_FAILURE;
-			}
 			if (state == STATE_WORD) {
 				word_len++;
 			}
 			else {
 				word_len = 1;
 				state = STATE_WORD;
+			}
+			if (!add_word_letter(symbol, terms_idx, word_len)) {
+				free_word_letters();
+				return EXIT_FAILURE;
 			}
 		}
 		symbol = fgetc(stdin);
@@ -167,7 +167,7 @@ int main(void) {
 int add_word_letter(int symbol, int terms_idx, int word_len) {
 	int letters_idx, value_min;
 	for (letters_idx = 0; letters_idx < letters_n && letters[letters_idx].symbol != symbol; letters_idx++);
-	if (word_len == 0) {
+	if (word_len == 1) {
 		value_min = 1;
 	}
 	else {
