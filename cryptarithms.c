@@ -15,8 +15,9 @@ typedef struct {
 	letter_t *letter;
 	int power;
 	int terms_idx;
+	int count;
 }
-word_letter_t;
+group_t;
 
 typedef enum {
 	STATE_START,
@@ -26,19 +27,19 @@ typedef enum {
 }
 state_t;
 
-int add_word_letter(int, int, int);
+int add_group(int, int, int);
 void set_letter(letter_t *, int, int);
-void set_word_letter(word_letter_t *, letter_t *, int);
-void set_word_letters_power(int);
-int compare_word_letters(const void *, const void *);
+void set_group(group_t *, letter_t *, int);
+void set_groups_power(int);
+int compare_groups(const void *, const void *);
 void cryptarithm(int, int, int);
 int check_remaining_terms(int, int, int);
 int check_terms(int, int);
-void free_word_letters(void);
+void free_groups(void);
 
-int letters_n, word_letters_n, word_len_max, terms_n, *sums, used_digits[LETTERS_MAX], nodes_n, solutions_n;
+int letters_n, groups_n1, word_len_max, terms_n, *sums, groups_n2, used_digits[LETTERS_MAX], nodes_n, solutions_n;
 letter_t letters[LETTERS_MAX];
-word_letter_t *word_letters;
+group_t *groups;
 
 int main(void) {
 	int terms_idx, word_len, symbol;
@@ -46,7 +47,7 @@ int main(void) {
 
 	/* Reset parsing variables for first cryptarithm */
 	letters_n = 0;
-	word_letters_n = 0;
+	groups_n1 = 0;
 	word_len_max = 0;
 	terms_idx = 0;
 	word_len = 0;
@@ -55,17 +56,17 @@ int main(void) {
 	/* Parse input */
 	symbol = fgetc(stdin);
 	while (!feof(stdin)) {
-		int digit;
+		int groups_idx, digit;
 		switch (symbol) {
 		case ' ':
 			if (state == STATE_START || state == STATE_SPACE) {
 				fprintf(stderr, "Invalid input\n");
 				fflush(stderr);
-				free_word_letters();
+				free_groups();
 				return EXIT_FAILURE;
 			}
 			if (state == STATE_WORD) {
-				set_word_letters_power(word_len);
+				set_groups_power(word_len);
 			}
 			state = STATE_SPACE;
 			break;
@@ -73,7 +74,7 @@ int main(void) {
 			if (state != STATE_SPACE) {
 				fprintf(stderr, "Invalid input\n");
 				fflush(stderr);
-				free_word_letters();
+				free_groups();
 				return EXIT_FAILURE;
 			}
 			state = STATE_OPERATOR;
@@ -82,7 +83,7 @@ int main(void) {
 			if (state != STATE_SPACE) {
 				fprintf(stderr, "Invalid input\n");
 				fflush(stderr);
-				free_word_letters();
+				free_groups();
 				return EXIT_FAILURE;
 			}
 			terms_idx++;
@@ -92,17 +93,17 @@ int main(void) {
 			if (state != STATE_WORD) {
 				fprintf(stderr, "Invalid input\n");
 				fflush(stderr);
-				free_word_letters();
+				free_groups();
 				return EXIT_FAILURE;
 			}
 			if (state == STATE_WORD) {
-				set_word_letters_power(word_len);
+				set_groups_power(word_len);
 			}
 			terms_n = terms_idx+1;
 			if (terms_n < 2) {
 				fprintf(stderr, "Invalid cryptarithm\n");
 				fflush(stderr);
-				free_word_letters();
+				free_groups();
 				return EXIT_FAILURE;
 			}
 
@@ -111,12 +112,27 @@ int main(void) {
 			if (!sums) {
 				fprintf(stderr, "Could not allocate memory for sums\n");
 				fflush(stderr);
-				free_word_letters();
+				free_groups();
 				return EXIT_FAILURE;
 			}
 
-			/* Sort word letters by ascending power/term index/symbol */
-			qsort(word_letters, (size_t)word_letters_n, sizeof(word_letter_t), compare_word_letters);
+			/* Sort input by ascending power/term index/symbol */
+			qsort(groups, (size_t)groups_n1, sizeof(group_t), compare_groups);
+
+			/* Group input by power/term index/symbol */
+			groups_n2 = 0;
+			for (groups_idx = 1; groups_idx < groups_n1; groups_idx++) {
+				if (compare_groups(groups+groups_idx, groups+groups_n2)) {
+					groups_n2++;
+					if (groups_n2 < groups_idx) {
+						groups[groups_n2] = groups[groups_idx];
+					}
+				}
+				else {
+					groups[groups_n2].count++;
+				}
+			}
+			groups_n2++;
 
 			/* Search for all solutions in cryptarithm */
 			for (digit = 0; digit < LETTERS_MAX; digit++) {
@@ -129,11 +145,11 @@ int main(void) {
 
 			/* Free cryptarithm data */
 			free(sums);
-			free_word_letters();
+			free_groups();
 
 			/* Reset parsing variables for next cryptarithm */
 			letters_n = 0;
-			word_letters_n = 0;
+			groups_n1 = 0;
 			word_len_max = 0;
 			terms_idx = 0;
 			word_len = 0;
@@ -144,7 +160,7 @@ int main(void) {
 			if (!isupper(symbol) || state == STATE_OPERATOR) {
 				fprintf(stderr, "Invalid input\n");
 				fflush(stderr);
-				free_word_letters();
+				free_groups();
 				return EXIT_FAILURE;
 			}
 			if (state == STATE_WORD) {
@@ -154,8 +170,8 @@ int main(void) {
 				word_len = 1;
 				state = STATE_WORD;
 			}
-			if (!add_word_letter(symbol, terms_idx, word_len)) {
-				free_word_letters();
+			if (!add_group(symbol, terms_idx, word_len)) {
+				free_groups();
 				return EXIT_FAILURE;
 			}
 		}
@@ -164,7 +180,7 @@ int main(void) {
 	return EXIT_SUCCESS;
 }
 
-int add_word_letter(int symbol, int terms_idx, int word_len) {
+int add_group(int symbol, int terms_idx, int word_len) {
 	int letters_idx, value_min;
 	for (letters_idx = 0; letters_idx < letters_n && letters[letters_idx].symbol != symbol; letters_idx++);
 	if (word_len == 1) {
@@ -186,24 +202,24 @@ int add_word_letter(int symbol, int terms_idx, int word_len) {
 			letters[letters_idx].value_min = value_min;
 		}
 	}
-	if (word_letters_n == 0) {
-		word_letters = malloc(sizeof(word_letter_t));
-		if (!word_letters) {
-			fprintf(stderr, "Could not allocate memory for word_letters\n");
+	if (groups_n1 == 0) {
+		groups = malloc(sizeof(group_t));
+		if (!groups) {
+			fprintf(stderr, "Could not allocate memory for groups\n");
 			fflush(stderr);
 			return 0;
 		}
 	}
 	else {
-		word_letter_t *word_letters_tmp = realloc(word_letters, sizeof(word_letter_t)*((size_t)word_letters_n+1));
-		if (!word_letters_tmp) {
-			fprintf(stderr, "Could not reallocate memory for word_letters\n");
+		group_t *groups_tmp = realloc(groups, sizeof(group_t)*((size_t)groups_n1+1));
+		if (!groups_tmp) {
+			fprintf(stderr, "Could not reallocate memory for groups\n");
 			fflush(stderr);
 			return 0;
 		}
-		word_letters = word_letters_tmp;
+		groups = groups_tmp;
 	}
-	set_word_letter(word_letters+word_letters_n, letters+letters_idx, terms_idx);
+	set_group(groups+groups_n1, letters+letters_idx, terms_idx);
 	return 1;
 }
 
@@ -214,37 +230,38 @@ void set_letter(letter_t *letter, int symbol, int value_min) {
 	letters_n++;
 }
 
-void set_word_letter(word_letter_t *word_letter, letter_t *letter, int terms_idx) {
-	word_letter->letter = letter;
-	word_letter->power = 0;
-	word_letter->terms_idx = terms_idx;
-	word_letters_n++;
+void set_group(group_t *group, letter_t *letter, int terms_idx) {
+	group->letter = letter;
+	group->power = 0;
+	group->terms_idx = terms_idx;
+	group->count = 1;
+	groups_n1++;
 }
 
-void set_word_letters_power(int word_len) {
-	int word_letters_idx, power;
-	for (word_letters_idx = word_letters_n-2, power = 1; power < word_len; word_letters_idx--, power++) {
-		word_letters[word_letters_idx].power = power;
+void set_groups_power(int word_len) {
+	int groups_idx, power;
+	for (groups_idx = groups_n1-2, power = 1; power < word_len; groups_idx--, power++) {
+		groups[groups_idx].power = power;
 	}
 	if (word_len > word_len_max) {
 		word_len_max = word_len;
 	}
 }
 
-int compare_word_letters(const void *a, const void *b) {
-const word_letter_t *word_letter_a = (const word_letter_t *)a, *word_letter_b = (const word_letter_t *)b;
-	if (word_letter_a->power != word_letter_b->power) {
-		return word_letter_a->power-word_letter_b->power;
+int compare_groups(const void *a, const void *b) {
+const group_t *group_a = (const group_t *)a, *group_b = (const group_t *)b;
+	if (group_a->power != group_b->power) {
+		return group_a->power-group_b->power;
 	}
-	if (word_letter_a->terms_idx != word_letter_b->terms_idx) {
-		return word_letter_a->terms_idx-word_letter_b->terms_idx;
+	if (group_a->terms_idx != group_b->terms_idx) {
+		return group_a->terms_idx-group_b->terms_idx;
 	}
-	return word_letter_a->letter->symbol-word_letter_b->letter->symbol;
+	return group_a->letter->symbol-group_b->letter->symbol;
 }
 
-void cryptarithm(int power_last, int terms_idx_last, int word_letters_idx) {
+void cryptarithm(int power_last, int terms_idx_last, int groups_idx) {
 	nodes_n++;
-	if (word_letters_idx == word_letters_n) {
+	if (groups_idx == groups_n2) {
 		if (check_remaining_terms(power_last, terms_idx_last, terms_n)) {
 			int letter_idx;
 			printf("SOLUTION %d\n", ++solutions_n);
@@ -255,39 +272,39 @@ void cryptarithm(int power_last, int terms_idx_last, int word_letters_idx) {
 		}
 	}
 	else {
-		if (word_letters[word_letters_idx].power > power_last) {
+		if (groups[groups_idx].power > power_last) {
 			int terms_idx;
 			if (power_last > -1) {
 				if (!check_remaining_terms(power_last, terms_idx_last, terms_n)) {
 					return;
 				}
 				for (terms_idx = 0; terms_idx < terms_n; terms_idx++) {
-					sums[word_letters[word_letters_idx].power*terms_n+terms_idx] = sums[power_last*terms_n+terms_idx]/LETTERS_MAX;
+					sums[groups[groups_idx].power*terms_n+terms_idx] = sums[power_last*terms_n+terms_idx]/LETTERS_MAX;
 				}
 			}
 			else {
 				for (terms_idx = 0; terms_idx < terms_n; terms_idx++) {
-					sums[word_letters[word_letters_idx].power*terms_n+terms_idx] = 0;
+					sums[groups[groups_idx].power*terms_n+terms_idx] = 0;
 				}
 			}
 		}
 		else {
-			if (!check_remaining_terms(word_letters[word_letters_idx].power, terms_idx_last, word_letters[word_letters_idx].terms_idx)) {
+			if (!check_remaining_terms(groups[groups_idx].power, terms_idx_last, groups[groups_idx].terms_idx)) {
 				return;
 			}
 		}
-		if (word_letters[word_letters_idx].letter->value == LETTERS_MAX) {
+		if (groups[groups_idx].letter->value == LETTERS_MAX) {
 
 			/* Letter not set - Try all possible values */
 			int value;
-			for (value = word_letters[word_letters_idx].letter->value_min; value < LETTERS_MAX; value++) {
+			for (value = groups[groups_idx].letter->value_min; value < LETTERS_MAX; value++) {
 				if (!used_digits[value]) {
 					used_digits[value] = 1;
-					word_letters[word_letters_idx].letter->value = value;
-					sums[word_letters[word_letters_idx].power*terms_n+word_letters[word_letters_idx].terms_idx] += value;
-					cryptarithm(word_letters[word_letters_idx].power, word_letters[word_letters_idx].terms_idx, word_letters_idx+1);
-					sums[word_letters[word_letters_idx].power*terms_n+word_letters[word_letters_idx].terms_idx] -= value;
-					word_letters[word_letters_idx].letter->value = LETTERS_MAX;
+					groups[groups_idx].letter->value = value;
+					sums[groups[groups_idx].power*terms_n+groups[groups_idx].terms_idx] += value*groups[groups_idx].count;
+					cryptarithm(groups[groups_idx].power, groups[groups_idx].terms_idx, groups_idx+1);
+					sums[groups[groups_idx].power*terms_n+groups[groups_idx].terms_idx] -= value*groups[groups_idx].count;
+					groups[groups_idx].letter->value = LETTERS_MAX;
 					used_digits[value] = 0;
 				}
 			}
@@ -295,9 +312,9 @@ void cryptarithm(int power_last, int terms_idx_last, int word_letters_idx) {
 		else {
 
 			/* Letter already set */
-			sums[word_letters[word_letters_idx].power*terms_n+word_letters[word_letters_idx].terms_idx] += word_letters[word_letters_idx].letter->value;
-			cryptarithm(word_letters[word_letters_idx].power, word_letters[word_letters_idx].terms_idx, word_letters_idx+1);
-			sums[word_letters[word_letters_idx].power*terms_n+word_letters[word_letters_idx].terms_idx] -= word_letters[word_letters_idx].letter->value;
+			sums[groups[groups_idx].power*terms_n+groups[groups_idx].terms_idx] += groups[groups_idx].letter->value*groups[groups_idx].count;
+			cryptarithm(groups[groups_idx].power, groups[groups_idx].terms_idx, groups_idx+1);
+			sums[groups[groups_idx].power*terms_n+groups[groups_idx].terms_idx] -= groups[groups_idx].letter->value*groups[groups_idx].count;
 		}
 	}
 }
@@ -320,8 +337,8 @@ int check_terms(int power, int terms_idx) {
 	}
 }
 
-void free_word_letters(void) {
-	if (word_letters_n > 0) {
-		free(word_letters);
+void free_groups(void) {
+	if (groups_n1 > 0) {
+		free(groups);
 	}
 }
