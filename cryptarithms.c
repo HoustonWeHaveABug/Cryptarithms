@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <time.h>
 
-#define LETTERS_MAX 10
+#define BASE_MIN 2
+#define BASE_MAX 26
 
 typedef struct {
 	int symbol;
@@ -37,13 +39,29 @@ int check_remaining_terms(int, int, int);
 int check_terms(int, int);
 void free_groups(void);
 
-int letters_n, groups_n1, word_len_max, terms_n, *sums, groups_n2, used_digits[LETTERS_MAX], nodes_n, solutions_n;
-letter_t letters[LETTERS_MAX];
+int base, letters_n, groups_n1, word_len_max, terms_n, *sums, groups_n2, used_digits[BASE_MAX];
+time_t time0;
+unsigned long long nodes_n, solutions_n;
+letter_t letters[BASE_MAX];
 group_t *groups;
 
-int main(void) {
+int main(int argc, char *argv[]) {
+	char *end;
 	int terms_idx, word_len, symbol;
 	state_t state;
+
+	/* Parse base argument */
+	if (argc != 2) {
+		fprintf(stderr, "Usage: %s <base>\n", argv[0]);
+		fflush(stderr);
+		return EXIT_FAILURE;
+	}
+	base = strtol(argv[1], &end, 10);
+	if (*end || base < BASE_MIN || base > BASE_MAX) {
+		fprintf(stderr, "Invalid base\n");
+		fflush(stderr);
+		return EXIT_FAILURE;
+	}
 
 	/* Reset parsing variables for first cryptarithm */
 	letters_n = 0;
@@ -135,13 +153,14 @@ int main(void) {
 			groups_n2++;
 
 			/* Search for all solutions in cryptarithm */
-			for (digit = 0; digit < LETTERS_MAX; digit++) {
+			for (digit = 0; digit < BASE_MAX; digit++) {
 				used_digits[digit] = 0;
 			}
 			nodes_n = 0;
+			time0 = time(NULL);
 			solutions_n = 0;
 			cryptarithm(-1, -1, 0);
-			printf("Nodes %d\n", nodes_n);
+			printf("Nodes %llu Time %lu s\n", nodes_n, time(NULL)-time0);
 
 			/* Free cryptarithm data */
 			free(sums);
@@ -190,7 +209,7 @@ int add_group(int symbol, int terms_idx, int word_len) {
 		value_min = 0;
 	}
 	if (letters_idx == letters_n) {
-		if (letters_n == LETTERS_MAX) {
+		if (letters_n == base) {
 			fprintf(stderr, "Too many letters\n");
 			fflush(stderr);
 			return 0;
@@ -226,7 +245,7 @@ int add_group(int symbol, int terms_idx, int word_len) {
 void set_letter(letter_t *letter, int symbol, int value_min) {
 	letter->symbol = symbol;
 	letter->value_min = value_min;
-	letter->value = LETTERS_MAX;
+	letter->value = base;
 	letters_n++;
 }
 
@@ -264,7 +283,8 @@ void cryptarithm(int power_last, int terms_idx_last, int groups_idx) {
 	if (groups_idx == groups_n2) {
 		if (check_remaining_terms(power_last, terms_idx_last, terms_n)) {
 			int letter_idx;
-			printf("SOLUTION %d\n", ++solutions_n);
+			solutions_n++;
+			printf("Solution %llu Nodes %llu Time %lu s\n", solutions_n, nodes_n, time(NULL)-time0);
 			for (letter_idx = 0; letter_idx < letters_n; letter_idx++) {
 				printf("%c = %d\n", letters[letter_idx].symbol, letters[letter_idx].value);
 			}
@@ -279,7 +299,7 @@ void cryptarithm(int power_last, int terms_idx_last, int groups_idx) {
 					return;
 				}
 				for (terms_idx = 0; terms_idx < terms_n; terms_idx++) {
-					sums[groups[groups_idx].power*terms_n+terms_idx] = sums[power_last*terms_n+terms_idx]/LETTERS_MAX;
+					sums[groups[groups_idx].power*terms_n+terms_idx] = sums[power_last*terms_n+terms_idx]/base;
 				}
 			}
 			else {
@@ -293,18 +313,18 @@ void cryptarithm(int power_last, int terms_idx_last, int groups_idx) {
 				return;
 			}
 		}
-		if (groups[groups_idx].letter->value == LETTERS_MAX) {
+		if (groups[groups_idx].letter->value == base) {
 
 			/* Letter not set - Try all possible values */
 			int value;
-			for (value = groups[groups_idx].letter->value_min; value < LETTERS_MAX; value++) {
+			for (value = groups[groups_idx].letter->value_min; value < base; value++) {
 				if (!used_digits[value]) {
 					used_digits[value] = 1;
 					groups[groups_idx].letter->value = value;
 					sums[groups[groups_idx].power*terms_n+groups[groups_idx].terms_idx] += value*groups[groups_idx].count;
 					cryptarithm(groups[groups_idx].power, groups[groups_idx].terms_idx, groups_idx+1);
 					sums[groups[groups_idx].power*terms_n+groups[groups_idx].terms_idx] -= value*groups[groups_idx].count;
-					groups[groups_idx].letter->value = LETTERS_MAX;
+					groups[groups_idx].letter->value = base;
 					used_digits[value] = 0;
 				}
 			}
@@ -333,7 +353,7 @@ int check_terms(int power, int terms_idx) {
 		return sums[power*terms_n+terms_idx] == sums[power*terms_n+terms_idx-1];
 	}
 	else {
-		return sums[power*terms_n+terms_idx]%LETTERS_MAX == sums[power*terms_n+terms_idx-1]%LETTERS_MAX;
+		return sums[power*terms_n+terms_idx]%base == sums[power*terms_n+terms_idx-1]%base;
 	}
 }
 
